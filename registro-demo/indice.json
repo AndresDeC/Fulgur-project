@@ -1,0 +1,35 @@
+{
+  "nombre": "Registro demo de Fulgur",
+  "extensiones": [
+    {
+      "id": "fulgur-nocturno",
+      "nombre": "Fulgur Nocturno",
+      "version": "1.0.0",
+      "descripcion": "Tema oscuro azul profundo con acento ámbar.",
+      "autor": "Fulgur",
+      "tipo": "tema",
+      "url": "tema-nocturno.json",
+      "sha256": "0b39866ad0ef4c64e10e5c658c8e3291c5c5d22a0b28a1ea3ecf1c0feff01579"
+    },
+    {
+      "id": "fulgur-claro",
+      "nombre": "Fulgur Claro",
+      "version": "1.0.0",
+      "descripcion": "Tema claro limpio con acento terracota.",
+      "autor": "Fulgur",
+      "tipo": "tema",
+      "url": "tema-claro.json",
+      "sha256": "7b87a61dbad7daf37f761046173c7a731cb36fdd05f75e0b58a0b3d83db7dd93"
+    },
+    {
+      "id": "snippets-rust",
+      "nombre": "Snippets de Rust",
+      "version": "1.0.0",
+      "descripcion": "Fragmentos de código Rust listos para insertar.",
+      "autor": "Fulgur",
+      "tipo": "snippets",
+      "url": "snippets-rust.json",
+      "sha256": "8f326d12baa88a113640da88dc068bf08a7115eb3c6319cfa206f54f5273e2ed"
+    }
+  ]
+}

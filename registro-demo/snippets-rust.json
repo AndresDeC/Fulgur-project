@@ -1,0 +1,25 @@
+{
+  "id": "snippets-rust",
+  "nombre": "Snippets de Rust",
+  "version": "1.0.0",
+  "tipo": "snippets",
+  "datos": {
+    "snippets": [
+      {
+        "atajo": "main",
+        "descripcion": "Función main básica",
+        "cuerpo": "fn main() {\n    println!(\"¡Hola, Fulgur!\");\n}"
+      },
+      {
+        "atajo": "test",
+        "descripcion": "Módulo de tests",
+        "cuerpo": "#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn funciona() {\n        assert_eq!(2 + 2, 4);\n    }\n}"
+      },
+      {
+        "atajo": "derive",
+        "descripcion": "Struct con derives comunes",
+        "cuerpo": "#[derive(Debug, Clone, PartialEq)]\npub struct Nombre {\n    // campos…\n}"
+      }
+    ]
+  }
+}

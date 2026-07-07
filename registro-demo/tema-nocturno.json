@@ -1,0 +1,13 @@
+{
+  "id": "fulgur-nocturno",
+  "nombre": "Fulgur Nocturno",
+  "version": "1.0.0",
+  "tipo": "tema",
+  "datos": {
+    "oscuro": true,
+    "fondo": [16, 18, 28],
+    "panel": [24, 27, 40],
+    "texto": [214, 220, 235],
+    "acento": [255, 200, 60]
+  }
+}
