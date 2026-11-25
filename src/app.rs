@@ -191,6 +191,121 @@ fn plural<'a>(n: usize, singular: &'a str, plural: &'a str) -> &'a str {
     if n == 1 { singular } else { plural }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::comando_ejecutar;
+    use std::path::Path;
+
+    #[test]
+    fn rust_en_proyecto_cargo_usa_cargo_run() {
+        // raiz = la propia carpeta de Fulgur, que sí tiene Cargo.toml.
+        let raiz = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let cmd = comando_ejecutar(&raiz.join("src/main.rs"), "rs", Some(raiz)).unwrap();
+        assert_eq!(cmd, "cargo run");
+    }
+
+    #[test]
+    fn rust_suelto_usa_rustc() {
+        // Sin raíz (archivo suelto) cae en rustc.
+        let cmd = comando_ejecutar(Path::new("C:/tmp/hola.rs"), "rs", None).unwrap();
+        assert!(cmd.starts_with("rustc "));
+        assert!(cmd.contains("hola.exe"));
+    }
+
+    #[test]
+    fn interpretados_lanzan_el_interprete() {
+        let p = Path::new("C:/tmp/x.py");
+        assert_eq!(comando_ejecutar(p, "py", None).unwrap(), "python \"C:/tmp/x.py\"");
+        let p = Path::new("C:/tmp/x.js");
+        assert_eq!(comando_ejecutar(p, "js", None).unwrap(), "node \"C:/tmp/x.js\"");
+    }
+
+    #[test]
+    fn lenguaje_sin_ejecucion_devuelve_none() {
+        assert!(comando_ejecutar(Path::new("x.txt"), "txt", None).is_none());
+        assert!(comando_ejecutar(Path::new("x.md"), "md", None).is_none());
+    }
+}
+
+/// Botón ▶ de ejecutar, dibujado a mano (triángulo verde) para que salga nítido
+/// en cualquier fuente.
+fn boton_run(ui: &mut egui::Ui) -> egui::Response {
+    let tam = 17.0;
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(tam, tam), egui::Sense::click());
+    let sobre = resp.hovered();
+    if sobre {
+        ui.painter().rect_filled(
+            rect.expand(2.0),
+            egui::CornerRadius::same(3),
+            ui.visuals().widgets.hovered.weak_bg_fill,
+        );
+    }
+    let verde = if sobre {
+        egui::Color32::from_rgb(0x6d, 0xe0, 0x4f)
+    } else {
+        egui::Color32::from_rgb(0x4c, 0xd1, 0x37)
+    };
+    let c = rect.center();
+    let r = tam * 0.3;
+    let puntos = vec![
+        c + egui::vec2(-r * 0.75, -r),
+        c + egui::vec2(-r * 0.75, r),
+        c + egui::vec2(r, 0.0),
+    ];
+    ui.painter()
+        .add(egui::Shape::convex_polygon(puntos, verde, egui::Stroke::NONE));
+    resp
+}
+
+/// Comando de PowerShell para ejecutar el archivo activo según su lenguaje.
+/// `raiz` es la carpeta abierta (para distinguir proyectos cargo/go de archivos sueltos).
+/// `None` = no sabemos ejecutar ese lenguaje.
+fn comando_ejecutar(
+    ruta: &std::path::Path,
+    lenguaje: &str,
+    raiz: Option<&std::path::Path>,
+) -> Option<String> {
+    let archivo = ruta.to_string_lossy();
+    let stem = ruta.file_stem().map(|s| s.to_string_lossy().into_owned());
+    let hay = |nombre: &str| raiz.is_some_and(|r| r.join(nombre).exists());
+
+    let comando = match lenguaje {
+        "rs" => {
+            if hay("Cargo.toml") {
+                "cargo run".to_owned()
+            } else {
+                let exe = stem?;
+                format!("rustc \"{archivo}\" -o \"{exe}.exe\"; ./\"{exe}.exe\"")
+            }
+        }
+        "go" => {
+            if hay("go.mod") {
+                "go run .".to_owned()
+            } else {
+                format!("go run \"{archivo}\"")
+            }
+        }
+        "py" => format!("python \"{archivo}\""),
+        "js" => format!("node \"{archivo}\""),
+        "ts" => format!("npx tsx \"{archivo}\""),
+        "rb" => format!("ruby \"{archivo}\""),
+        "php" => format!("php \"{archivo}\""),
+        "lua" => format!("lua \"{archivo}\""),
+        "sh" => format!("bash \"{archivo}\""),
+        "java" => format!("java \"{archivo}\""),
+        "c" => {
+            let exe = stem?;
+            format!("gcc \"{archivo}\" -o \"{exe}.exe\"; ./\"{exe}.exe\"")
+        }
+        "cpp" => {
+            let exe = stem?;
+            format!("g++ \"{archivo}\" -o \"{exe}.exe\"; ./\"{exe}.exe\"")
+        }
+        _ => return None,
+    };
+    Some(comando)
+}
+
 /// Pestaña del panel inferior estilo VSC: texto pequeño en mayúsculas,
 /// subrayado cuando está activa.
 fn pestana_panel(ui: &mut egui::Ui, activa: bool, texto: &str) -> bool {
@@ -353,6 +468,11 @@ impl Fulgur {
             });
 
             ui.menu_button("Terminal", |ui| {
+                if ui.button("Ejecutar archivo        F5").clicked() {
+                    self.ejecutar_archivo(ui.ctx());
+                    ui.close();
+                }
+                ui.separator();
                 if ui.button("Mostrar terminal").clicked() {
                     self.mostrar_inferior = true;
                     self.panel_inferior = PanelInferior::Terminal;
@@ -371,6 +491,14 @@ impl Fulgur {
                     ui.close();
                 }
             });
+
+            ui.add_space(6.0);
+            if boton_run(ui)
+                .on_hover_text("Ejecutar archivo (F5)")
+                .clicked()
+            {
+                self.ejecutar_archivo(ui.ctx());
+            }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(raiz) = &self.explorador.raiz {
@@ -533,6 +661,9 @@ impl Fulgur {
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W)) {
             self.editor.cerrar_activa();
         }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F5)) {
+            self.ejecutar_archivo(ctx);
+        }
     }
 
     /// Mantiene al servidor LSP al día con el archivo activo y vuelca sus
@@ -604,6 +735,37 @@ impl Fulgur {
             Ok(Some(ruta)) => self.estado = format!("Guardado: {}", ruta.display()),
             Ok(None) => {}
             Err(e) => self.estado = e,
+        }
+    }
+
+    /// Guarda y ejecuta el archivo activo en la terminal integrada (botón ▶ / F5).
+    fn ejecutar_archivo(&mut self, ctx: &egui::Context) {
+        // Guardar primero para ejecutar siempre lo último escrito.
+        self.guardar();
+        let Some(pestana) = self.editor.pestana_activa() else {
+            self.estado = "No hay ningún archivo que ejecutar".to_owned();
+            return;
+        };
+        let Some(ruta) = pestana.ruta.clone() else {
+            self.estado = "Guarda el archivo antes de ejecutarlo".to_owned();
+            return;
+        };
+        let lenguaje = pestana.lenguaje();
+        let raiz = self.explorador.raiz.clone();
+        match comando_ejecutar(&ruta, &lenguaje, raiz.as_deref()) {
+            Some(comando) => {
+                // Mostrar la terminal y lanzar el comando ahí.
+                self.mostrar_inferior = true;
+                self.panel_inferior = PanelInferior::Terminal;
+                self.estado = format!("Ejecutando: {comando}");
+                self.terminal.ejecutar_comando(comando, ctx.clone());
+            }
+            None => {
+                self.estado = format!(
+                    "No sé ejecutar «{}» todavía",
+                    editor::etiqueta_lenguaje(&lenguaje)
+                );
+            }
         }
     }
 

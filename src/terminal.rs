@@ -131,6 +131,16 @@ impl Terminal {
         });
     }
 
+    /// Ejecuta un comando lanzado desde fuera (p. ej. el botón Ejecutar ▶),
+    /// reutilizando todo el pipeline de la terminal. No pisa un comando en curso.
+    pub fn ejecutar_comando(&mut self, comando: String, ctx: egui::Context) {
+        if self.ejecutando {
+            return;
+        }
+        self.entrada = comando;
+        self.ejecutar(ctx);
+    }
+
     fn recibir_mensajes(&mut self) {
         let Some(rx) = &self.rx else { return };
         let mut terminado = false;
