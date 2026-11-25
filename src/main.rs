@@ -12,6 +12,7 @@
 #![windows_subsystem = "windows"]
 
 mod app;
+mod diagnostico;
 mod editor;
 mod explorador;
 mod git;

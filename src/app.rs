@@ -433,11 +433,51 @@ impl Fulgur {
                             if ui.selectable_label(elegido, *etiqueta).clicked() {
                                 if let Some(pe) = self.editor.pestana_activa_mut() {
                                     pe.lenguaje_manual = Some((*codigo).to_owned());
+                                    pe.diag_sucio = true;
                                 }
                                 ui.close();
                             }
                         }
                     });
+                }
+
+                // Errores de sintaxis de la pestaña activa (tree-sitter).
+                if let Some((soportado, n)) = self.editor.diagnostico_activo() {
+                    if soportado {
+                        ui.separator();
+                        if n == 0 {
+                            ui.label(
+                                egui::RichText::new("Sin errores")
+                                    .size(11.5)
+                                    .color(egui::Color32::from_rgb(0x8a, 0xe0, 0x9a)),
+                            );
+                        } else {
+                            let texto = if n == 1 {
+                                "⚠ 1 error de sintaxis".to_owned()
+                            } else {
+                                format!("⚠ {n} errores de sintaxis")
+                            };
+                            // Detalle para el tooltip: qué falla y en qué línea.
+                            let detalle: Vec<String> = self
+                                .editor
+                                .diagnosticos_activos()
+                                .iter()
+                                .take(12)
+                                .map(|d| format!("Línea {}: {}", d.linea, d.mensaje))
+                                .collect();
+                            ui.label(
+                                egui::RichText::new(texto)
+                                    .size(11.5)
+                                    .color(egui::Color32::from_rgb(0xff, 0x8a, 0x8a)),
+                            )
+                            .on_hover_ui(|ui| {
+                                ui.weak("Detectado por tree-sitter, sin compilar:");
+                                for linea in &detalle {
+                                    ui.label(linea);
+                                }
+                            });
+                        }
+                    }
                 }
             });
         });

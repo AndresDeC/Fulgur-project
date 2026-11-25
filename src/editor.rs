@@ -46,6 +46,10 @@ pub struct Pestana {
     pub modificado: bool,
     /// Lenguaje elegido a mano (para archivos sin título o para forzarlo).
     pub lenguaje_manual: Option<String>,
+    /// Errores de sintaxis del contenido actual (tree-sitter).
+    pub diagnosticos: Vec<crate::diagnostico::Diagnostico>,
+    /// true cuando el contenido o el lenguaje cambió y hay que reanalizar.
+    pub diag_sucio: bool,
 }
 
 impl Pestana {
@@ -111,6 +115,8 @@ impl Editor {
             contenido,
             modificado: false,
             lenguaje_manual: None,
+            diagnosticos: Vec::new(),
+            diag_sucio: true,
         });
         Ok(())
     }
@@ -121,6 +127,8 @@ impl Editor {
             contenido: String::new(),
             modificado: false,
             lenguaje_manual: None,
+            diagnosticos: Vec::new(),
+            diag_sucio: true,
         });
     }
 
@@ -185,6 +193,23 @@ impl Editor {
 
     pub fn pestana_activa(&self) -> Option<&Pestana> {
         self.pestanas.get(self.activa)
+    }
+
+    /// Para la barra de estado: (el lenguaje activo tiene analizador, nº de errores).
+    pub fn diagnostico_activo(&self) -> Option<(bool, usize)> {
+        self.pestana_activa().map(|p| {
+            (
+                crate::diagnostico::soportado(&p.lenguaje()),
+                p.diagnosticos.len(),
+            )
+        })
+    }
+
+    /// Los errores de sintaxis de la pestaña activa (para el tooltip de detalle).
+    pub fn diagnosticos_activos(&self) -> &[crate::diagnostico::Diagnostico] {
+        self.pestana_activa()
+            .map(|p| p.diagnosticos.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Cierra las pestañas cuyo archivo (o carpeta contenedora) fue eliminado.
@@ -259,23 +284,38 @@ impl Editor {
             ui.ctx().fonts_mut(|f| f.layout_job(trabajo))
         };
 
-        let respuesta = egui::ScrollArea::both()
+        egui::ScrollArea::both()
             .id_salt("editor")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.add(
-                    egui::TextEdit::multiline(&mut pestana.contenido)
-                        .id(id_texto)
-                        .font(egui::TextStyle::Monospace)
-                        .code_editor()
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(40)
-                        .layouter(&mut layouter),
-                )
+                let salida = egui::TextEdit::multiline(&mut pestana.contenido)
+                    .id(id_texto)
+                    .font(egui::TextStyle::Monospace)
+                    .code_editor()
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(40)
+                    .layouter(&mut layouter)
+                    .show(ui);
+
+                if salida.response.changed() {
+                    pestana.modificado = true;
+                    pestana.diag_sucio = true;
+                }
+                // Reanalizar solo cuando el contenido o el lenguaje cambió:
+                // tree-sitter es rápido, pero no hace falta hacerlo cada fotograma.
+                if pestana.diag_sucio {
+                    pestana.diagnosticos =
+                        crate::diagnostico::analizar(&lenguaje, &pestana.contenido);
+                    pestana.diag_sucio = false;
+                }
+                // Subrayar en rojo los errores de sintaxis encontrados.
+                dibujar_subrayados(
+                    ui.painter(),
+                    &salida.galley,
+                    salida.galley_pos,
+                    &pestana.diagnosticos,
+                );
             });
-        if respuesta.inner.changed() {
-            pestana.modificado = true;
-        }
     }
 
     /// Franja "Selecciona un lenguaje" para archivos sin título, como en VSC.
@@ -298,6 +338,7 @@ impl Editor {
                         {
                             self.pestanas[self.activa].lenguaje_manual =
                                 Some((*codigo).to_owned());
+                            self.pestanas[self.activa].diag_sucio = true;
                             ui.close();
                         }
                     }
@@ -388,5 +429,51 @@ impl Editor {
                 ui.weak("Abre una carpeta desde el explorador para empezar.");
             });
         });
+    }
+}
+
+/// Subraya con una línea ondulada roja cada error de sintaxis del archivo.
+/// `origen` es dónde quedó dibujado el texto en pantalla (`galley_pos`), al que
+/// hay que sumar las posiciones locales que devuelve el galley.
+fn dibujar_subrayados(
+    painter: &egui::Painter,
+    galley: &egui::Galley,
+    origen: egui::Pos2,
+    diags: &[crate::diagnostico::Diagnostico],
+) {
+    use egui::text::CCursor;
+    let rojo = egui::Color32::from_rgb(0xff, 0x55, 0x55);
+    for d in diags {
+        let r0 = galley.pos_from_cursor(CCursor::new(d.inicio_char));
+        let r1 = galley.pos_from_cursor(CCursor::new(d.fin_char));
+        let y = origen.y + r0.bottom() - 0.5;
+        let x0 = origen.x + r0.left();
+        // Error en una sola línea: subrayamos hasta su final. Si abarca varias,
+        // subrayamos solo hasta el borde derecho de la primera línea.
+        let misma_fila = (r1.top() - r0.top()).abs() < 1.0;
+        let x1 = if misma_fila {
+            origen.x + r1.left()
+        } else {
+            origen.x + galley.rect.right()
+        };
+        let x1 = x1.max(x0 + 6.0); // ancho mínimo: los tokens MISSING miden 0.
+        subrayar_ondulado(painter, x0, x1, y, rojo);
+    }
+}
+
+/// Dibuja una línea en zigzag (el clásico "garabato" de error) entre x0 y x1.
+fn subrayar_ondulado(painter: &egui::Painter, x0: f32, x1: f32, y: f32, color: egui::Color32) {
+    let paso = 2.5;
+    let amplitud = 1.5;
+    let mut puntos = Vec::new();
+    let mut x = x0;
+    let mut abajo = false;
+    while x <= x1 {
+        puntos.push(egui::pos2(x, y + if abajo { amplitud } else { 0.0 }));
+        x += paso;
+        abajo = !abajo;
+    }
+    if puntos.len() >= 2 {
+        painter.add(egui::Shape::line(puntos, egui::Stroke::new(1.0, color)));
     }
 }

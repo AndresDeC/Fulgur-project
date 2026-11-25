@@ -20,6 +20,14 @@ sha2 = "0.10"         # verificación de integridad de extensiones
 dirs = "5"            # carpeta de configuración del usuario (~/.fulgur)
 arboard = "3"         # leer el portapapeles (menú Edición → Pegar)
 
+# Detección de errores de sintaxis: parser real, incremental y muy ligero
+# (pocos MB), no un modelo de IA. Cada gramática es un paquete aparte.
+tree-sitter = "0.25"
+tree-sitter-rust = "0.24"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-json = "0.24"
+
 # El binario final ligero: optimiza y quita símbolos en release.
 [profile.release]
 opt-level = 3
