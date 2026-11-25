@@ -25,11 +25,17 @@ mod terminal;
 use eframe::egui;
 
 fn main() -> eframe::Result {
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([1280.0, 820.0])
+        .with_min_inner_size([760.0, 480.0])
+        .with_title("Fulgur ⚡");
+    // Icono de la ventana (y de la barra de tareas): el rayo de neón.
+    if let Ok(icono) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/logo-256.png")) {
+        viewport = viewport.with_icon(std::sync::Arc::new(icono));
+    }
+
     let opciones = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1280.0, 820.0])
-            .with_min_inner_size([760.0, 480.0])
-            .with_title("Fulgur ⚡"),
+        viewport,
         ..Default::default()
     };
 

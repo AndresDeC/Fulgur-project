@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Fulgur" width="140">
+</p>
+
 # Fulgur ⚡
 
 Un IDE nativo, ultraligero, escrito en Rust. Se parece a Visual Studio Code pero
@@ -125,6 +129,6 @@ extensiones instaladas).
 - [x] Backend `glow` para minimizar la RAM.
 - [x] Detección de errores de sintaxis con tree-sitter (19 lenguajes).
 - [x] Errores **semánticos** vía LSP (rust-analyzer, gopls): tipos, imports, borrow checker.
+- [x] Más temas profesionales (Neon Black, Tokyo Night, One Dark, Papel, Solar).
+- [x] Botón «Ejecutar ▶» (y F5) que detecta el lenguaje y lanza el comando en la terminal.
 - [ ] Más funciones LSP: autocompletado, ir a definición, hover.
-- [ ] Más temas profesionales (Neon Black pulido, claro cuidado).
-- [ ] Botón «Ejecutar ▶» que detecte el lenguaje y lance el comando en la terminal.

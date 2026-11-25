@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Logo de Fulgur: un rayo de neón cian sobre negro, a juego con el tema Neon Black. -->
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d0d16"/>
+      <stop offset="1" stop-color="#07070c"/>
+    </linearGradient>
+    <radialGradient id="resplandor" cx="0.5" cy="0.44" r="0.55">
+      <stop offset="0" stop-color="#00e5ff" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#00e5ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rayo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bff7ff"/>
+      <stop offset="0.5" stop-color="#00e5ff"/>
+      <stop offset="1" stop-color="#00a9cc"/>
+    </linearGradient>
+    <filter id="brillo" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#fondo)"/>
+  <rect width="512" height="512" rx="112" fill="url(#resplandor)"/>
+  <path d="M282 26 L128 266 L230 266 L179 486 L384 205 L266 205 L323 26 Z"
+        fill="url(#rayo)" filter="url(#brillo)"/>
+  <rect x="6" y="6" width="500" height="500" rx="106" fill="none"
+        stroke="#00e5ff" stroke-opacity="0.18" stroke-width="3"/>
+</svg>
