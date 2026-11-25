@@ -1,0 +1,43 @@
+# Compila Fulgur para Windows y publica el .exe en GitHub Releases.
+#
+# Se dispara al empujar una etiqueta de versión (p. ej. `git tag v0.2.0 && git push --tags`).
+# El resultado es un enlace de descarga directo al fulgur.exe autónomo.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar toolchain de Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Compilar en release
+        run: cargo build --release
+
+      - name: Renombrar el binario con la versión
+        shell: pwsh
+        run: |
+          Copy-Item target/release/fulgur.exe "fulgur-${{ github.ref_name }}-windows-x64.exe"
+
+      - name: Publicar en Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: fulgur-${{ github.ref_name }}-windows-x64.exe
+          name: Fulgur ${{ github.ref_name }}
+          body: |
+            Fulgur ⚡ ${{ github.ref_name }} — IDE nativo y ultraligero en Rust.
+
+            **Descarga:** `fulgur-${{ github.ref_name }}-windows-x64.exe` (abajo). Es autónomo: descárgalo y ejecútalo, sin instalación.
