@@ -4,7 +4,13 @@ version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-eframe = "0.34.3"
+# Backend glow (OpenGL): bastante más ligero en RAM que el wgpu por defecto,
+# que es lo único que necesita una UI 2D como la de Fulgur.
+eframe = { version = "0.34.3", default-features = false, features = [
+    "glow",
+    "default_fonts",
+    "accesskit",
+] }
 egui_extras = { version = "0.34.3", features = ["syntect"] }
 rfd = "0.15"          # diálogos nativos de abrir/guardar archivo y carpeta
 serde = { version = "1", features = ["derive"] }
