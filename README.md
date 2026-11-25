@@ -135,4 +135,5 @@ extensiones instaladas).
 - [x] Errores **semánticos** vía LSP (rust-analyzer, gopls): tipos, imports, borrow checker.
 - [x] Más temas profesionales (Neon Black, Tokyo Night, One Dark, Papel, Solar).
 - [x] Botón «Ejecutar ▶» (y F5) que detecta el lenguaje y lanza el comando en la terminal.
+- [x] Auto-actualizador: avisa de versiones nuevas y se reemplaza solo (como VS Code).
 - [ ] Más funciones LSP: autocompletado, ir a definición, hover.

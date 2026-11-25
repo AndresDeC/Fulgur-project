@@ -12,6 +12,7 @@
 //  │ barra de estado                              │
 //  └──────────────────────────────────────────────┘
 
+use crate::actualizador::Actualizador;
 use crate::editor::{self, Editor};
 use crate::explorador::{Accion, Explorador};
 use crate::git::Git;
@@ -43,6 +44,7 @@ pub struct Fulgur {
     mercado: Mercado,
     git: Git,
     lsp: GestorLsp,
+    actualizador: Actualizador,
     vista_lateral: VistaLateral,
     mostrar_lateral: bool,
     panel_inferior: PanelInferior,
@@ -62,6 +64,7 @@ impl Default for Fulgur {
             mercado: Mercado::default(),
             git: Git::default(),
             lsp: GestorLsp::default(),
+            actualizador: Actualizador::default(),
             vista_lateral: VistaLateral::Explorador,
             mostrar_lateral: true,
             panel_inferior: PanelInferior::Terminal,
@@ -79,10 +82,15 @@ impl eframe::App for Fulgur {
             // Tema integrado guardado.
             tema::aplicar_indice(ui.ctx(), tema::cargar_guardado());
             self.tema_inicial_aplicado = true;
+            // Buscar actualizaciones al arrancar (solo en binarios release;
+            // en desarrollo no tiene sentido reemplazar el exe de target/debug).
+            #[cfg(not(debug_assertions))]
+            self.actualizador.comprobar(ui.ctx());
         }
 
         self.atajos(ui.ctx());
         self.actualizar_lsp(ui.ctx());
+        self.actualizador.recibir();
 
         // --- Barra de menú ---
         egui::Panel::top("menu")
@@ -93,6 +101,18 @@ impl eframe::App for Fulgur {
             )
             .show_separator_line(false)
             .show_inside(ui, |ui| self.barra_menu(ui));
+
+        // --- Barra de aviso de actualización (estilo VS Code) ---
+        if self.actualizador.hay_aviso() {
+            egui::Panel::top("aviso_actualizacion")
+                .frame(
+                    egui::Frame::new()
+                        .fill(tema::p().barra_menu)
+                        .inner_margin(egui::Margin::symmetric(8, 5)),
+                )
+                .show_separator_line(false)
+                .show_inside(ui, |ui| self.actualizador.ui_barra(ui));
+        }
 
         // --- Barra de estado (abajo del todo) ---
         egui::Panel::bottom("estado")
@@ -486,6 +506,10 @@ impl Fulgur {
             });
 
             ui.menu_button("Ayuda", |ui| {
+                if ui.button("Buscar actualizaciones").clicked() {
+                    self.actualizador.comprobar(ui.ctx());
+                    ui.close();
+                }
                 if ui.button("Acerca de Fulgur").clicked() {
                     self.mostrar_acerca = true;
                     ui.close();

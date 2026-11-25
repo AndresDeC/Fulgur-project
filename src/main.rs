@@ -11,6 +11,7 @@
 // Esta línea evita que se abra una ventana negra de consola al lanzar la app en Windows.
 #![windows_subsystem = "windows"]
 
+mod actualizador;
 mod app;
 mod diagnostico;
 mod editor;
