@@ -76,8 +76,8 @@ impl Default for Fulgur {
 impl eframe::App for Fulgur {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         if !self.tema_inicial_aplicado {
-            // Tema integrado guardado (Normal / Oscuro / Claro).
-            tema::aplicar(ui.ctx(), tema::cargar_guardado());
+            // Tema integrado guardado.
+            tema::aplicar_indice(ui.ctx(), tema::cargar_guardado());
             self.tema_inicial_aplicado = true;
         }
 
@@ -338,27 +338,13 @@ impl Fulgur {
 
             ui.menu_button("Ver", |ui| {
                 ui.menu_button("Tema", |ui| {
-                    let actual = tema::actual();
-                    if ui
-                        .selectable_label(actual == tema::Tema::Normal, "Normal (gris)")
-                        .clicked()
-                    {
-                        tema::aplicar(ui.ctx(), tema::Tema::Normal);
-                        ui.close();
-                    }
-                    if ui
-                        .selectable_label(actual == tema::Tema::Oscuro, "Oscuro (negro neón)")
-                        .clicked()
-                    {
-                        tema::aplicar(ui.ctx(), tema::Tema::Oscuro);
-                        ui.close();
-                    }
-                    if ui
-                        .selectable_label(actual == tema::Tema::Claro, "Claro (blanco)")
-                        .clicked()
-                    {
-                        tema::aplicar(ui.ctx(), tema::Tema::Claro);
-                        ui.close();
+                    ui.set_min_width(160.0);
+                    let actual = tema::indice_actual();
+                    for (i, paleta) in tema::temas().iter().enumerate() {
+                        if ui.selectable_label(actual == i, paleta.nombre).clicked() {
+                            tema::aplicar_indice(ui.ctx(), i);
+                            ui.close();
+                        }
                     }
                 });
                 ui.separator();
