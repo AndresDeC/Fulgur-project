@@ -124,6 +124,7 @@ extensiones instaladas).
 - [x] Editor, terminal, Git, IA y mercado de extensiones.
 - [x] Backend `glow` para minimizar la RAM.
 - [x] Detección de errores de sintaxis con tree-sitter (19 lenguajes).
-- [ ] Soporte de lenguaje vía LSP (autocompletado, ir a definición, errores semánticos).
+- [x] Errores **semánticos** vía LSP (rust-analyzer, gopls): tipos, imports, borrow checker.
+- [ ] Más funciones LSP: autocompletado, ir a definición, hover.
 - [ ] Más temas profesionales (Neon Black pulido, claro cuidado).
 - [ ] Botón «Ejecutar ▶» que detecte el lenguaje y lance el comando en la terminal.
