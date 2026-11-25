@@ -30,7 +30,23 @@ fn gramatica(codigo: &str) -> Option<tree_sitter::Language> {
         "rs" => tree_sitter_rust::LANGUAGE,
         "py" => tree_sitter_python::LANGUAGE,
         "js" => tree_sitter_javascript::LANGUAGE,
+        "ts" => tree_sitter_typescript::LANGUAGE_TYPESCRIPT,
         "json" => tree_sitter_json::LANGUAGE,
+        "html" => tree_sitter_html::LANGUAGE,
+        "css" => tree_sitter_css::LANGUAGE,
+        "c" => tree_sitter_c::LANGUAGE,
+        "cpp" => tree_sitter_cpp::LANGUAGE,
+        "cs" => tree_sitter_c_sharp::LANGUAGE,
+        "java" => tree_sitter_java::LANGUAGE,
+        "go" => tree_sitter_go::LANGUAGE,
+        "php" => tree_sitter_php::LANGUAGE_PHP,
+        "rb" => tree_sitter_ruby::LANGUAGE,
+        "lua" => tree_sitter_lua::LANGUAGE,
+        "sh" => tree_sitter_bash::LANGUAGE,
+        "xml" => tree_sitter_xml::LANGUAGE_XML,
+        "yaml" => tree_sitter_yaml::LANGUAGE,
+        "sql" => tree_sitter_sequel::LANGUAGE,
+        // Sin gramática (texto, markdown y toml son tolerantes a errores): no se analiza.
         _ => return None,
     };
     Some(lang.into())
@@ -138,6 +154,33 @@ mod tests {
     fn json_invalido_detectado() {
         let codigo = "{ \"a\": }"; // valor faltante
         assert!(!analizar("json", codigo).is_empty());
+    }
+
+    #[test]
+    fn go_con_error_detectado() {
+        let codigo = "package main\nfunc main() {\n    x :=\n}\n"; // valor faltante
+        assert!(!analizar("go", codigo).is_empty());
+    }
+
+    #[test]
+    fn c_con_error_detectado() {
+        let codigo = "int main( {\n    return 0;\n}\n"; // paréntesis mal
+        assert!(!analizar("c", codigo).is_empty());
+    }
+
+    #[test]
+    fn cobertura_amplia_de_lenguajes() {
+        // Los 19 lenguajes que deben tener analizador de sintaxis.
+        for c in [
+            "rs", "py", "js", "ts", "json", "html", "css", "c", "cpp", "cs", "java", "go", "php",
+            "rb", "lua", "sh", "xml", "yaml", "sql",
+        ] {
+            assert!(soportado(c), "{c} debería estar soportado");
+        }
+        // Estos no (son tolerantes a errores o texto plano).
+        for c in ["txt", "md", "toml"] {
+            assert!(!soportado(c), "{c} no debería estar soportado");
+        }
     }
 
     #[test]
