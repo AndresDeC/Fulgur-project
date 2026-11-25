@@ -82,9 +82,13 @@ cargo build --release
 
 ### Descargable
 
-Cada versión etiquetada publica automáticamente un `.exe` de Windows autónomo en la
-pestaña **[Releases](../../releases)** del repositorio (vía GitHub Actions). Descárgalo
-y ejecútalo: no hay instalador.
+El `.exe` de Windows se recompila **automáticamente en cada cambio** del proyecto
+(GitHub Actions). El enlace de la última versión siempre es el mismo:
+
+- **[Descargar la última versión](../../releases/download/latest/fulgur-latest-windows-x64.exe)**
+
+También hay [releases versionadas](../../releases) para cada etiqueta `vX.Y.Z`. En
+todos los casos el binario es autónomo: se descarga y se ejecuta, sin instalador.
 
 ---
 

@@ -1,11 +1,17 @@
 # Compila Fulgur para Windows y publica el .exe en GitHub Releases.
 #
-# Se dispara al empujar una etiqueta de versión (p. ej. `git tag v0.2.0 && git push --tags`).
-# El resultado es un enlace de descarga directo al fulgur.exe autónomo.
+# Dos modos automáticos:
+#   - Cada push a master  -> actualiza la release "latest" (siempre el último .exe).
+#     Enlace de descarga fijo:
+#     https://github.com/AndresDeC/Fulgur-project/releases/download/latest/fulgur-latest-windows-x64.exe
+#   - Cada etiqueta vX.Y.Z -> crea una release versionada aparte.
+#
+# El binario es autónomo: se descarga y se ejecuta, sin instalación.
 name: Release
 
 on:
   push:
+    branches: [master]
     tags:
       - "v*"
 
@@ -27,17 +33,36 @@ jobs:
       - name: Compilar en release
         run: cargo build --release
 
-      - name: Renombrar el binario con la versión
+      # Decide el nombre y tipo de release según el disparador (tag vs push a master).
+      - name: Preparar la release
         shell: pwsh
         run: |
-          Copy-Item target/release/fulgur.exe "fulgur-${{ github.ref_name }}-windows-x64.exe"
+          if ($env:GITHUB_REF -like "refs/tags/*") {
+            "TAG=$env:GITHUB_REF_NAME"              | Out-File -FilePath $env:GITHUB_ENV -Append
+            "RELNAME=Fulgur $env:GITHUB_REF_NAME"   | Out-File -FilePath $env:GITHUB_ENV -Append
+            "PRERELEASE=false"                       | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            "TAG=latest"                             | Out-File -FilePath $env:GITHUB_ENV -Append
+            "RELNAME=Última versión (master)"        | Out-File -FilePath $env:GITHUB_ENV -Append
+            "PRERELEASE=true"                        | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+
+      - name: Renombrar el binario
+        shell: pwsh
+        run: Copy-Item target/release/fulgur.exe "fulgur-$env:TAG-windows-x64.exe"
 
       - name: Publicar en Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: fulgur-${{ github.ref_name }}-windows-x64.exe
-          name: Fulgur ${{ github.ref_name }}
+          tag_name: ${{ env.TAG }}
+          name: ${{ env.RELNAME }}
+          prerelease: ${{ env.PRERELEASE }}
+          target_commitish: ${{ github.sha }}
+          files: fulgur-${{ env.TAG }}-windows-x64.exe
           body: |
-            Fulgur ⚡ ${{ github.ref_name }} — IDE nativo y ultraligero en Rust.
+            Fulgur ⚡ — IDE nativo y ultraligero en Rust.
 
-            **Descarga:** `fulgur-${{ github.ref_name }}-windows-x64.exe` (abajo). Es autónomo: descárgalo y ejecútalo, sin instalación.
+            **Descarga:** `fulgur-${{ env.TAG }}-windows-x64.exe` (abajo). Es autónomo:
+            descárgalo y ejecútalo, sin instalación.
+
+            Esta descarga se regenera automáticamente en cada cambio del proyecto.
