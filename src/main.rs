@@ -17,6 +17,7 @@ mod editor;
 mod explorador;
 mod git;
 mod ia;
+mod lsp;
 mod mercado;
 mod tema;
 mod terminal;

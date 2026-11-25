@@ -16,6 +16,7 @@ use crate::editor::{self, Editor};
 use crate::explorador::{Accion, Explorador};
 use crate::git::Git;
 use crate::ia::Ia;
+use crate::lsp::GestorLsp;
 use crate::mercado::Mercado;
 use crate::tema;
 use crate::terminal::Terminal;
@@ -41,6 +42,7 @@ pub struct Fulgur {
     ia: Ia,
     mercado: Mercado,
     git: Git,
+    lsp: GestorLsp,
     vista_lateral: VistaLateral,
     mostrar_lateral: bool,
     panel_inferior: PanelInferior,
@@ -59,6 +61,7 @@ impl Default for Fulgur {
             ia: Ia::default(),
             mercado: Mercado::default(),
             git: Git::default(),
+            lsp: GestorLsp::default(),
             vista_lateral: VistaLateral::Explorador,
             mostrar_lateral: true,
             panel_inferior: PanelInferior::Terminal,
@@ -79,6 +82,7 @@ impl eframe::App for Fulgur {
         }
 
         self.atajos(ui.ctx());
+        self.actualizar_lsp(ui.ctx());
 
         // --- Barra de menú ---
         egui::Panel::top("menu")
@@ -180,6 +184,11 @@ impl eframe::App for Fulgur {
 
         self.ventana_acerca(ui.ctx());
     }
+}
+
+/// Elige singular o plural según la cantidad.
+fn plural<'a>(n: usize, singular: &'a str, plural: &'a str) -> &'a str {
+    if n == 1 { singular } else { plural }
 }
 
 /// Pestaña del panel inferior estilo VSC: texto pequeño en mayúsculas,
@@ -441,41 +450,58 @@ impl Fulgur {
                     });
                 }
 
-                // Errores de sintaxis de la pestaña activa (tree-sitter).
-                if let Some((soportado, n)) = self.editor.diagnostico_activo() {
-                    if soportado {
+                // Diagnósticos de la pestaña activa (LSP o tree-sitter).
+                if let Some((analizado, errores, avisos)) = self.editor.analisis_activo() {
+                    if analizado {
                         ui.separator();
-                        if n == 0 {
-                            ui.label(
-                                egui::RichText::new("Sin errores")
-                                    .size(11.5)
-                                    .color(egui::Color32::from_rgb(0x8a, 0xe0, 0x9a)),
-                            );
-                        } else {
-                            let texto = if n == 1 {
-                                "⚠ 1 error de sintaxis".to_owned()
-                            } else {
-                                format!("⚠ {n} errores de sintaxis")
-                            };
-                            // Detalle para el tooltip: qué falla y en qué línea.
-                            let detalle: Vec<String> = self
-                                .editor
-                                .diagnosticos_activos()
-                                .iter()
-                                .take(12)
-                                .map(|d| format!("Línea {}: {}", d.linea, d.mensaje))
-                                .collect();
-                            ui.label(
-                                egui::RichText::new(texto)
-                                    .size(11.5)
-                                    .color(egui::Color32::from_rgb(0xff, 0x8a, 0x8a)),
+                        let (texto, color) = if errores > 0 {
+                            (
+                                format!("⚠ {errores} {}", plural(errores, "error", "errores")),
+                                egui::Color32::from_rgb(0xff, 0x8a, 0x8a),
                             )
-                            .on_hover_ui(|ui| {
-                                ui.weak("Detectado por tree-sitter, sin compilar:");
+                        } else if avisos > 0 {
+                            (
+                                format!("{avisos} {}", plural(avisos, "aviso", "avisos")),
+                                egui::Color32::from_rgb(0xff, 0xc1, 0x07),
+                            )
+                        } else {
+                            (
+                                "Sin problemas".to_owned(),
+                                egui::Color32::from_rgb(0x8a, 0xe0, 0x9a),
+                            )
+                        };
+                        // Detalle para el tooltip: qué falla y en qué línea.
+                        let detalle: Vec<String> = self
+                            .editor
+                            .diagnosticos_activos()
+                            .iter()
+                            .take(14)
+                            .map(|d| format!("Línea {}: {}", d.linea, d.mensaje))
+                            .collect();
+                        let fuente = if self.editor.activa_usa_lsp() {
+                            "Análisis semántico del servidor de lenguaje:"
+                        } else {
+                            "Detectado por tree-sitter, sin compilar:"
+                        };
+                        let resp = ui.label(egui::RichText::new(texto).size(11.5).color(color));
+                        if !detalle.is_empty() {
+                            resp.on_hover_ui(|ui| {
+                                ui.weak(fuente);
                                 for linea in &detalle {
                                     ui.label(linea);
                                 }
                             });
+                        }
+                    }
+                }
+
+                // Indicador del servidor LSP activo.
+                if self.editor.activa_usa_lsp() {
+                    if let Some(lang) = self.editor.pestana_activa().map(|p| p.lenguaje()) {
+                        if let Some((nombre, _)) = crate::lsp::servidor_para(&lang) {
+                            ui.separator();
+                            ui.label(estado(nombre))
+                                .on_hover_text("Servidor de lenguaje (LSP) activo");
                         }
                     }
                 }
@@ -523,6 +549,39 @@ impl Fulgur {
         }
     }
 
+    /// Mantiene al servidor LSP al día con el archivo activo y vuelca sus
+    /// diagnósticos en la pestaña. Se ejecuta una vez por fotograma.
+    fn actualizar_lsp(&mut self, ctx: &egui::Context) {
+        self.lsp.recibir();
+
+        let Some(pestana) = self.editor.pestana_activa_mut() else {
+            return;
+        };
+        // Solo archivos guardados (con ruta) y con servidor para su lenguaje.
+        let Some(ruta) = pestana.ruta.clone() else {
+            pestana.usa_lsp = false;
+            return;
+        };
+        let lenguaje = pestana.lenguaje();
+        if crate::lsp::servidor_para(&lenguaje).is_none() {
+            pestana.usa_lsp = false;
+            return;
+        }
+
+        let cambiado = pestana.diag_sucio;
+        let gestionado =
+            self.lsp
+                .sincronizar(&ruta, &lenguaje, &pestana.contenido, cambiado, ctx);
+        pestana.usa_lsp = gestionado;
+        if gestionado {
+            // La app es dueña de los diagnósticos de este archivo (no tree-sitter).
+            pestana.diag_sucio = false;
+            if let Some(diags) = self.lsp.diagnosticos(&ruta, &lenguaje, &pestana.contenido) {
+                pestana.diagnosticos = diags;
+            }
+        }
+    }
+
     fn procesar_accion_explorador(&mut self, accion: Accion) {
         match accion {
             Accion::Abrir(ruta) => self.abrir_archivo(ruta),
@@ -548,6 +607,7 @@ impl Fulgur {
         self.explorador.raiz = Some(dir.clone());
         self.terminal.cambiar_cwd(dir.clone());
         self.git.establecer_raiz(dir.clone());
+        self.lsp.establecer_raiz(dir.clone());
         self.vista_lateral = VistaLateral::Explorador;
         self.mostrar_lateral = true;
         self.estado = format!("Carpeta abierta: {}", dir.display());

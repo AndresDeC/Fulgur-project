@@ -11,7 +11,17 @@
 
 use tree_sitter::{Node, Parser};
 
-/// Un error de sintaxis ya localizado, listo para pintar y listar.
+/// Gravedad de un diagnóstico. tree-sitter solo produce errores; el LSP
+/// (ver `crate::lsp`) también produce avisos e información.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Severidad {
+    Error,
+    Advertencia,
+    Info,
+}
+
+/// Un diagnóstico ya localizado, listo para pintar y listar. Lo producen tanto
+/// tree-sitter (errores de sintaxis) como el LSP (errores semánticos y avisos).
 pub struct Diagnostico {
     /// Línea donde empieza (1-based), para mostrarla al usuario.
     pub linea: usize,
@@ -20,6 +30,7 @@ pub struct Diagnostico {
     /// traducir a coordenadas de pantalla y dibujar el subrayado.
     pub inicio_char: usize,
     pub fin_char: usize,
+    pub severidad: Severidad,
     pub mensaje: String,
 }
 
@@ -96,6 +107,7 @@ pub fn analizar(codigo_lenguaje: &str, fuente: &str) -> Vec<Diagnostico> {
             linea: b.linea,
             inicio_char: fuente[..b.inicio_byte.min(fuente.len())].chars().count(),
             fin_char: fuente[..b.fin_byte.min(fuente.len())].chars().count(),
+            severidad: Severidad::Error,
             mensaje: b.mensaje,
         })
         .collect()

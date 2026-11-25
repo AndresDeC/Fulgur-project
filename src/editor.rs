@@ -46,10 +46,13 @@ pub struct Pestana {
     pub modificado: bool,
     /// Lenguaje elegido a mano (para archivos sin título o para forzarlo).
     pub lenguaje_manual: Option<String>,
-    /// Errores de sintaxis del contenido actual (tree-sitter).
+    /// Diagnósticos del contenido actual (de tree-sitter o del LSP).
     pub diagnosticos: Vec<crate::diagnostico::Diagnostico>,
     /// true cuando el contenido o el lenguaje cambió y hay que reanalizar.
     pub diag_sucio: bool,
+    /// true si un servidor LSP gestiona este archivo; entonces el editor no
+    /// usa tree-sitter y los diagnósticos los pone la app desde el LSP.
+    pub usa_lsp: bool,
 }
 
 impl Pestana {
@@ -117,6 +120,7 @@ impl Editor {
             lenguaje_manual: None,
             diagnosticos: Vec::new(),
             diag_sucio: true,
+            usa_lsp: false,
         });
         Ok(())
     }
@@ -129,6 +133,7 @@ impl Editor {
             lenguaje_manual: None,
             diagnosticos: Vec::new(),
             diag_sucio: true,
+            usa_lsp: false,
         });
     }
 
@@ -195,14 +200,24 @@ impl Editor {
         self.pestanas.get(self.activa)
     }
 
-    /// Para la barra de estado: (el lenguaje activo tiene analizador, nº de errores).
-    pub fn diagnostico_activo(&self) -> Option<(bool, usize)> {
+    /// Para la barra de estado: (hay análisis, nº de errores, nº de avisos).
+    /// Hay análisis si el lenguaje lo soporta tree-sitter o lo gestiona el LSP.
+    pub fn analisis_activo(&self) -> Option<(bool, usize, usize)> {
+        use crate::diagnostico::Severidad;
         self.pestana_activa().map(|p| {
-            (
-                crate::diagnostico::soportado(&p.lenguaje()),
-                p.diagnosticos.len(),
-            )
+            let analizado = crate::diagnostico::soportado(&p.lenguaje()) || p.usa_lsp;
+            let errores = p
+                .diagnosticos
+                .iter()
+                .filter(|d| d.severidad == Severidad::Error)
+                .count();
+            (analizado, errores, p.diagnosticos.len() - errores)
         })
+    }
+
+    /// true si el archivo activo lo gestiona un servidor LSP.
+    pub fn activa_usa_lsp(&self) -> bool {
+        self.pestana_activa().is_some_and(|p| p.usa_lsp)
     }
 
     /// Los errores de sintaxis de la pestaña activa (para el tooltip de detalle).
@@ -301,9 +316,10 @@ impl Editor {
                     pestana.modificado = true;
                     pestana.diag_sucio = true;
                 }
-                // Reanalizar solo cuando el contenido o el lenguaje cambió:
-                // tree-sitter es rápido, pero no hace falta hacerlo cada fotograma.
-                if pestana.diag_sucio {
+                // Reanalizar con tree-sitter solo cuando cambió el contenido y
+                // ningún servidor LSP gestiona el archivo (si lo hay, sus
+                // diagnósticos semánticos los pone la app y son mejores).
+                if !pestana.usa_lsp && pestana.diag_sucio {
                     pestana.diagnosticos =
                         crate::diagnostico::analizar(&lenguaje, &pestana.contenido);
                     pestana.diag_sucio = false;
@@ -441,9 +457,14 @@ fn dibujar_subrayados(
     origen: egui::Pos2,
     diags: &[crate::diagnostico::Diagnostico],
 ) {
+    use crate::diagnostico::Severidad;
     use egui::text::CCursor;
-    let rojo = egui::Color32::from_rgb(0xff, 0x55, 0x55);
     for d in diags {
+        let color = match d.severidad {
+            Severidad::Error => egui::Color32::from_rgb(0xff, 0x55, 0x55),
+            Severidad::Advertencia => egui::Color32::from_rgb(0xff, 0xc1, 0x07),
+            Severidad::Info => egui::Color32::from_rgb(0x4f, 0xc3, 0xf7),
+        };
         let r0 = galley.pos_from_cursor(CCursor::new(d.inicio_char));
         let r1 = galley.pos_from_cursor(CCursor::new(d.fin_char));
         let y = origen.y + r0.bottom() - 0.5;
@@ -457,7 +478,7 @@ fn dibujar_subrayados(
             origen.x + galley.rect.right()
         };
         let x1 = x1.max(x0 + 6.0); // ancho mínimo: los tokens MISSING miden 0.
-        subrayar_ondulado(painter, x0, x1, y, rojo);
+        subrayar_ondulado(painter, x0, x1, y, color);
     }
 }
 
